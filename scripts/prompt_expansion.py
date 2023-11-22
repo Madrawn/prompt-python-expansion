@@ -2,10 +2,10 @@ from modules import scripts
 import gradio as gr
 import itertools
 from modules.ui_components import InputAccordion
+import numpy as np
 
 
-class RepeatSamplingScript(scripts.Script):
-
+class PromptExpansionScript(scripts.Script):
     def __init__(self):
         pass
 
@@ -21,12 +21,14 @@ class RepeatSamplingScript(scripts.Script):
         """
 
         with InputAccordion(value=True, label="Enable Prompt expansion") as self.checkbox:
-            self.markdown = gr.Markdown(value=(
-                "Expands python list comprehension like `[f'{x} dogs' for x in range(start,[stop,step])]` or `[f'{x} dogs' for x in ['black','grey']]`. \nIf"
-                " set to 'Prompts' will automatically adjust the batch count. \nIf positive and negative prompts are expanded then it will result in the"
-                " product, for example for `pos=[1,2,3]` and `neg=[4,5]`:\n positive = `[1,1,2,2,3,3]`\n negative = `[4,5,4,5,4,5]`\n"
-                " Same for multiple [] in single prompt\n"
-                "\nClashes with dynamic prompt extension"))
+            self.markdown = gr.Markdown(
+                value=(
+                    "Expands python list comprehension like `a ['red','blue'] tree in a ['desert', 'city']`,`[f'{x} dogs' for x in range(start,[stop,step])]`"
+                    " or `[f'{x} dogs' for x in ['black','grey']]`. \nIf set to 'Prompts' will automatically adjust the batch count. \nIf positive and negative"
+                    " prompts are expanded then it will result in the product, for example for `pos=[1,2,3]` and `neg=[4,5]`:\n positive = `[1,1,2,2,3,3]`\n"
+                    " negative = `[4,5,4,5,4,5]`\n Same for multiple [] in single prompt\n\nClashes with dynamic prompt extension"
+                )
+            )
             with gr.Row():
                 self.output = gr.Radio(choices=["Multiline", "Prompts"], value="Prompts", label="As what the multiple prompts should be returned")
         return (self.markdown, self.checkbox, self.output)
@@ -52,7 +54,7 @@ class RepeatSamplingScript(scripts.Script):
         prompt_pos = expand_prompts([p.strip() for p in prompt_pos.split("\n") if p.strip()])
         prompt_neg = expand_prompts([p.strip() for p in prompt_neg.split("\n") if p.strip()])
         if len(prompt_neg) == 0:
-            prompt_neg = ['']
+            prompt_neg = [""]
         combinations = list(itertools.product(prompt_pos, prompt_neg))
         p.prompt, p.negative_prompt = next((list(a), list(b)) for a, b in [zip(*combinations)])
         p.n_iter = len(p.prompt) // p.batch_size
@@ -69,8 +71,8 @@ def parse_brackets(val):
                 stack += 1
             if c == "]" and stack > 0:
                 stack -= 1
-                if (stack == 0):
-                    result.append(val[j:i + 1])
+                if stack == 0:
+                    result.append(val[j : i + 1])
     except:
         pass
 
@@ -101,14 +103,19 @@ def expand_prompts(prompt):
         return prompt
 
 
-assert parse_brackets("Hello stuff in here] and also [sometimes recursive [brackets[0]]] in here") == ['[sometimes recursive [brackets[0]]]']
+assert parse_brackets("Hello stuff in here] and also [sometimes recursive [brackets[0]]] in here") == ["[sometimes recursive [brackets[0]]]"]
 assert parse_brackets("Hello stuff in here] and also [sometimes recursive [brackets[0]] in here") == []
-assert parse_brackets(r"Hello (stuff in here) and also [sometimes recursive {brackets[0]}] in here") == [r'[sometimes recursive {brackets[0]}]']
+assert parse_brackets(r"Hello (stuff in here) and also [sometimes recursive {brackets[0]}] in here") == [r"[sometimes recursive {brackets[0]}]"]
 assert parse_brackets("Hello [stuff in here] and also [sometimes recursive [brackets[0]] [brackets[1]]] in here") == [
-    '[stuff in here]', '[sometimes recursive [brackets[0]] [brackets[1]]]'
+    "[stuff in here]",
+    "[sometimes recursive [brackets[0]] [brackets[1]]]",
 ]
 assert expand_prompts("hello") == "hello"
 assert expand_prompts(["hello", "hi"]) == ["hello", "hi"]
-assert expand_prompts(["[f'{x} colored' for x in ['red', 'green']] wall"]) == ['red colored wall', 'green colored wall']
-assert expand_prompts(["[f'{x} colored' for x in ['red', 'green']] ['tree','wall']"
-                      ]) == ['red colored tree', 'red colored wall', 'green colored tree', 'green colored wall']
+assert expand_prompts(["[f'{x} colored' for x in ['red', 'green']] wall"]) == ["red colored wall", "green colored wall"]
+assert expand_prompts(["[f'{x} colored' for x in ['red', 'green']] ['tree','wall']"]) == [
+    "red colored tree",
+    "red colored wall",
+    "green colored tree",
+    "green colored wall",
+]
